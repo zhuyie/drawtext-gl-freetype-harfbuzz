@@ -1,6 +1,9 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -13,7 +16,9 @@ int main(int argc, char* agrv[])
 {
     int ret_code;
     int width, height;
-    GLFWwindow* window;
+    GLFWwindow* window = NULL;
+    FT_Library ft_library = NULL;
+    FT_Int ft_version_major, ft_version_minor, ft_version_patch;
 
     fprintf(stdout, "GLFW Version: %s\n", glfwGetVersionString());
 
@@ -50,6 +55,15 @@ int main(int argc, char* agrv[])
     }
     fprintf(stdout, "OpenGL Version: %d.%d\n", GLVersion.major, GLVersion.minor);
 
+    if (FT_Init_FreeType(&ft_library))
+    {
+        fprintf(stderr, "FT_Init_FreeType failed\n");
+        ret_code = 1;
+        goto Exit0;
+    }
+    FT_Library_Version(ft_library, &ft_version_major, &ft_version_minor, &ft_version_patch);
+    fprintf(stdout, "FreeType Version: %d.%d.%d\n", ft_version_major, ft_version_minor, ft_version_patch);
+
     while (!glfwWindowShouldClose(window))
     {
         glfwGetFramebufferSize(window, &width, &height);
@@ -64,6 +78,8 @@ int main(int argc, char* agrv[])
     ret_code = 0;
 
 Exit0:
+    if (ft_library != NULL)
+        FT_Done_FreeType(ft_library);
     glfwTerminate();
     return ret_code;
 }
