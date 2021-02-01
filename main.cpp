@@ -41,7 +41,7 @@ int main(int argc, char* agrv[])
 
     if (!glfwInit())
     {
-        fprintf(stderr, "gladInit failed\n");
+        fprintf(stderr, "glfwInit failed\n");
         ret_code = 1;
         goto Exit0;
     }
