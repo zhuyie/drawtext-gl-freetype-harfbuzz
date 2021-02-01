@@ -3,6 +3,8 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <hb.h>
+#include <hb-ft.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,13 +14,26 @@ static void error_callback(int error, const char* description)
     fprintf(stderr, "Error: %s\n", description);
 }
 
+static const char* opengl_version_string(char* buf, size_t buf_size)
+{
+    snprintf(buf, buf_size, "%d.%d", GLVersion.major, GLVersion.minor);
+    return buf;
+}
+
+static const char* freetype_version_string(FT_Library library, char* buf, size_t buf_size)
+{
+    FT_Int major, minor, patch;
+    FT_Library_Version(library, &major, &minor, &patch);
+    snprintf(buf, buf_size, "%d.%d.%d", major, minor, patch);
+    return buf;
+}
+
 int main(int argc, char* agrv[])
 {
-    int ret_code;
-    int width, height;
+    int ret_code = 0;
+    char version[100] = { 0 };
     GLFWwindow* window = NULL;
     FT_Library ft_library = NULL;
-    FT_Int ft_version_major, ft_version_minor, ft_version_patch;
 
     fprintf(stdout, "GLFW Version: %s\n", glfwGetVersionString());
 
@@ -53,7 +68,7 @@ int main(int argc, char* agrv[])
         ret_code = 1;
         goto Exit0;
     }
-    fprintf(stdout, "OpenGL Version: %d.%d\n", GLVersion.major, GLVersion.minor);
+    fprintf(stdout, "OpenGL Version: %s\n", opengl_version_string(version, sizeof(version)));
 
     if (FT_Init_FreeType(&ft_library))
     {
@@ -61,11 +76,13 @@ int main(int argc, char* agrv[])
         ret_code = 1;
         goto Exit0;
     }
-    FT_Library_Version(ft_library, &ft_version_major, &ft_version_minor, &ft_version_patch);
-    fprintf(stdout, "FreeType Version: %d.%d.%d\n", ft_version_major, ft_version_minor, ft_version_patch);
+    fprintf(stdout, "FreeType Version: %s\n", freetype_version_string(ft_library, version, sizeof(version)));
+
+    fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
 
     while (!glfwWindowShouldClose(window))
     {
+        int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         glViewport(0, 0, width, height);
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
