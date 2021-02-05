@@ -32,6 +32,7 @@ add_executable(drawtext
 target_include_directories(drawtext
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include"
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/glfw/include"
+    PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/glm"
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/freetype/include"
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/harfbuzz/src")
 
