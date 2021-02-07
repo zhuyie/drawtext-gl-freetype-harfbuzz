@@ -26,6 +26,7 @@ add_subdirectory(deps/harfbuzz)
 # drawtext
 add_executable(drawtext 
     main.cpp
+    scope_guard.h
     deps/glad/src/glad.c
     )
 

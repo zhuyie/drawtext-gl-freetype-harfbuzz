@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <string>
 #include <map>
+#include <memory>
+
+#include "scope_guard.h"
 
 static void error_callback(int error, const char* description)
 {
@@ -62,53 +65,51 @@ const char* fragment_shader_string =
 
 static bool create_shader_program(GLuint& programID)
 {
-    bool res = false;
-    unsigned int vertex = 0, fragment = 0;
     int success;
-    char infoLog[1024];
+    char info_log[1024];
 
     // vertex shader
-    vertex = glCreateShader(GL_VERTEX_SHADER);
+    GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
+    auto vertex_guard = scopeGuard([&vertex]{ glDeleteShader(vertex); });
     glShaderSource(vertex, 1, &vertex_shader_string, NULL);
     glCompileShader(vertex);
     glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
     if (!success)
     {
-        glGetShaderInfoLog(vertex, 1024, NULL, infoLog);
-        fprintf(stderr, "create_shader_program: vertex shader compile failed: %s\n", infoLog);
-        goto Exit0;
+        glGetShaderInfoLog(vertex, 1024, NULL, info_log);
+        fprintf(stderr, "create_shader_program: vertex shader compile failed: %s\n", info_log);
+        return false;
     }
 
     // fragment Shader
-    fragment = glCreateShader(GL_FRAGMENT_SHADER);
+    GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
+    auto fragment_guard = scopeGuard([&fragment]{ glDeleteShader(fragment); });
     glShaderSource(fragment, 1, &fragment_shader_string, NULL);
     glCompileShader(fragment);
     glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
     if (!success)
     {
-        glGetShaderInfoLog(fragment, 1024, NULL, infoLog);
-        fprintf(stderr, "create_shader_program: fragment shader compile failed: %s\n", infoLog);
-        goto Exit0;
+        glGetShaderInfoLog(fragment, 1024, NULL, info_log);
+        fprintf(stderr, "create_shader_program: fragment shader compile failed: %s\n", info_log);
+        return false;
     }
     
     // shader Program
     programID = glCreateProgram();
+    auto program_guard = scopeGuard([&programID]{ glDeleteProgram(programID); });
     glAttachShader(programID, vertex);
     glAttachShader(programID, fragment);
     glLinkProgram(programID);
     glGetProgramiv(programID, GL_LINK_STATUS, &success);
     if (!success)
     {
-        glGetProgramInfoLog(programID, 1024, NULL, infoLog);
-        fprintf(stderr, "create_shader_program: link failed: %s\n", infoLog);
-        goto Exit0;
+        glGetProgramInfoLog(programID, 1024, NULL, info_log);
+        fprintf(stderr, "create_shader_program: link failed: %s\n", info_log);
+        return false;
     }
-
-    res = true;
-Exit0:
-    glDeleteShader(vertex);
-    glDeleteShader(fragment);
-    return res;
+    
+    program_guard.dismiss();
+    return true;
 }
 
 struct Character {
@@ -222,22 +223,20 @@ void render_text(
 
 int main(int argc, char* agrv[])
 {
-    int ret_code = 0;
     char version[100] = { 0 };
-    GLFWwindow* window = NULL;
-    FT_Library ft_library = NULL;
-    GLuint shader_program = 0;
 
     fprintf(stdout, "GLFW Version: %s\n", glfwGetVersionString());
 
+    // Initialize GLFW
     glfwSetErrorCallback(error_callback);
-
     if (!glfwInit())
     {
         fprintf(stderr, "glfwInit failed\n");
-        ret_code = 1;
-        goto Exit0;
+        return 1;
     }
+    auto glfw_guard = scopeGuard([]{ glfwTerminate(); });
+    
+    // Create window
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -248,29 +247,30 @@ int main(int argc, char* agrv[])
     // https://www.glfw.org/docs/3.3/window_guide.html#GLFW_SCALE_TO_MONITOR
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
 
-    window = glfwCreateWindow(800, 600, "drawtext-gl-freetype-harfbuzz", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(800, 600, "drawtext-gl-freetype-harfbuzz", NULL, NULL);
     if (!window)
     {
         fprintf(stderr, "glfwCreateWindow failed\n");
-        ret_code = 1;
-        goto Exit0;
+        return 1;
     }
     glfwMakeContextCurrent(window);
 
+    // Initialize GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         fprintf(stderr, "gladLoadGLLoader failed\n");
-        ret_code = 1;
-        goto Exit0;
+        return 1;
     }
     fprintf(stdout, "OpenGL Version: %s\n", opengl_version_string(version, sizeof(version)));
 
+    // Create shader program
+    GLuint shader_program = 0;
     if (!create_shader_program(shader_program))
     {
-        ret_code = 1;
-        goto Exit0;
+        return 1;
     }
     
+    // Create VAO && VBO
     unsigned int VAO, VBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -282,30 +282,33 @@ int main(int argc, char* agrv[])
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+    // OpenGL states
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // disable byte-alignment restriction
     glEnable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    if (FT_Init_FreeType(&ft_library))
+    // Initialize FreeType
+    FT_Library ft;
+    if (FT_Init_FreeType(&ft))
     {
         fprintf(stderr, "FT_Init_FreeType failed\n");
-        ret_code = 1;
-        goto Exit0;
+        return 1;
     }
-    fprintf(stdout, "FreeType Version: %s\n", freetype_version_string(ft_library, version, sizeof(version)));
+    auto ft_guard = scopeGuard([&ft]{ FT_Done_FreeType(ft); });
+    fprintf(stdout, "FreeType Version: %s\n", freetype_version_string(ft, version, sizeof(version)));
 
     FT_Face face;
-    if (FT_New_Face(ft_library, "../fonts/NotoSans-Regular.ttf", 0, &face))
+    if (FT_New_Face(ft, "../fonts/NotoSans-Regular.ttf", 0, &face))
     {
         fprintf(stderr, "FT_New_Face failed\n");
-        ret_code = 1;
-        goto Exit0;
+        return 1;
     }
     FT_Set_Pixel_Sizes(face, 0, 72);
 
     fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
 
+    // Event loop
     while (!glfwWindowShouldClose(window))
     {
         int width, height;
@@ -321,13 +324,5 @@ int main(int argc, char* agrv[])
         glfwWaitEvents();
     }
 
-    ret_code = 0;
-
-Exit0:
-    if (shader_program)
-        glDeleteProgram(shader_program);
-    if (ft_library != NULL)
-        FT_Done_FreeType(ft_library);
-    glfwTerminate();
-    return ret_code;
+    return 0;
 }
