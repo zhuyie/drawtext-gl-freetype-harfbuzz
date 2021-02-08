@@ -221,6 +221,31 @@ void render_text(
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+static bool create_font(FT_Library ft, const char* font_path, float size_in_points, float content_scale, FT_Face* face)
+{
+    if (FT_New_Face(ft, font_path, 0, face))
+    {
+        return false;
+    }
+#if defined(_WIN32)
+    const int default_logic_dpi_x = 96;
+    const int default_logic_dpi_y = 96;
+#elif defined(__APPLE__)
+    const int default_logic_dpi_x = 72;
+    const int default_logic_dpi_y = 72;
+#else
+    #error "not implemented"
+#endif
+    FT_Set_Char_Size(
+        *face, 
+        0,                                  // same as character height
+        size_in_points*64,                  // char_height in 1/64th of points
+        default_logic_dpi_x*content_scale,  // horizontal device resolution
+        default_logic_dpi_y*content_scale   // vertical device resolution
+    );
+    return true;
+}
+
 int main(int argc, char* agrv[])
 {
     char version[100] = { 0 };
@@ -254,6 +279,9 @@ int main(int argc, char* agrv[])
         return 1;
     }
     glfwMakeContextCurrent(window);
+
+    float content_scale;
+    glfwGetWindowContentScale(window, NULL, &content_scale);
 
     // Initialize GLAD
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -298,13 +326,12 @@ int main(int argc, char* agrv[])
     auto ft_guard = scopeGuard([&ft]{ FT_Done_FreeType(ft); });
     fprintf(stdout, "FreeType Version: %s\n", freetype_version_string(ft, version, sizeof(version)));
 
-    FT_Face face;
-    if (FT_New_Face(ft, "../fonts/NotoSans-Regular.ttf", 0, &face))
+    FT_Face font;
+    if (!create_font(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale, &font))
     {
-        fprintf(stderr, "FT_New_Face failed\n");
+        fprintf(stderr, "create_font failed\n");
         return 1;
     }
-    FT_Set_Pixel_Sizes(face, 0, 72);
 
     fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
 
@@ -317,7 +344,11 @@ int main(int argc, char* agrv[])
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         
-        render_text(shader_program, VAO, VBO, width, height, face, "This is a test.", 25.0f, 25.0f, 1.0f, glm::vec3(1.0f, 0.f, 0.f));
+        render_text(
+            shader_program, VAO, VBO, width, height, font, 
+            "This is a test.", 25.0f*content_scale, 25.0f*content_scale, 
+            1.0f, glm::vec3(1.0f, 0.f, 0.f)
+        );
 
         glfwSwapBuffers(window);
 
