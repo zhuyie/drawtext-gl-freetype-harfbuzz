@@ -228,20 +228,20 @@ static bool create_font(FT_Library ft, const char* font_path, float size_in_poin
         return false;
     }
 #if defined(_WIN32)
-    const int default_logic_dpi_x = 96;
-    const int default_logic_dpi_y = 96;
+    const int logic_dpi_x = 96;
+    const int logic_dpi_y = 96;
 #elif defined(__APPLE__)
-    const int default_logic_dpi_x = 72;
-    const int default_logic_dpi_y = 72;
+    const int logic_dpi_x = 72;
+    const int logic_dpi_y = 72;
 #else
     #error "not implemented"
 #endif
     FT_Set_Char_Size(
         *face, 
-        0,                                  // same as character height
-        size_in_points*64,                  // char_height in 1/64th of points
-        default_logic_dpi_x*content_scale,  // horizontal device resolution
-        default_logic_dpi_y*content_scale   // vertical device resolution
+        0,                                // same as character height
+        size_in_points*content_scale*64,  // char_height in 1/64th of points
+        logic_dpi_x,                      // horizontal device resolution
+        logic_dpi_y                       // vertical device resolution
     );
     return true;
 }
