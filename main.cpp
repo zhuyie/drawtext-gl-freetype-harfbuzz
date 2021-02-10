@@ -112,27 +112,26 @@ static bool create_shader_program(GLuint& programID)
     return true;
 }
 
-struct Character {
+struct Glyph {
     unsigned int TextureID;  // ID handle of the glyph texture
     glm::ivec2   Size;       // Size of glyph
     glm::ivec2   Bearing;    // Offset from baseline to left/top of glyph
-    unsigned int Advance;    // Offset to advance to next glyph
 };
 
-typedef std::map<char, Character> CharacterMap;
-CharacterMap Characters;
+typedef std::map<unsigned int, Glyph> GlyphCache;
+GlyphCache Glyphs;
 
-bool get_character(FT_Face face, char c, Character& x)
+bool get_glyph(FT_Face face, unsigned int glyph_index, Glyph& x)
 {
-    CharacterMap::iterator iter = Characters.find(c);
-    if (iter != Characters.end())
+    GlyphCache::iterator iter = Glyphs.find(glyph_index);
+    if (iter != Glyphs.end())
     {
         x = iter->second;
         return true;
     }
 
-    // load character glyph 
-    if (FT_Load_Char(face, c, FT_LOAD_RENDER))
+    // load glyph 
+    if (FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER))
     {
         return false;
     }
@@ -156,14 +155,13 @@ bool get_character(FT_Face face, char c, Character& x)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // now store character for later use
-    Character character = {
+    // now store Glyph for later use
+    x = Glyph {
         texture, 
         glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
-        glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-        (unsigned int)face->glyph->advance.x
+        glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top)
     };
-    Characters.insert(std::pair<char, Character>(c, character));
+    Glyphs.insert(GlyphCache::value_type(glyph_index, x));
 
     return true;
 }
@@ -180,43 +178,72 @@ void render_text(
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(vao);
 
-    // iterate through all characters
-    std::string::const_iterator c;
-    for (c = text.begin(); c != text.end(); c++)
+    // Create a hb_buffer.
+    hb_buffer_t *buf = hb_buffer_create();
+    auto buf_guard = scopeGuard([&buf]{ hb_buffer_destroy(buf); });
+    // Put text in.
+    hb_buffer_add_utf8(buf, text.c_str(), -1, 0, -1);
+    // Set the script, language and direction of the buffer.
+    hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
+    hb_buffer_set_script(buf, HB_SCRIPT_LATIN);
+    hb_buffer_set_language(buf, hb_language_from_string("en", -1));
+    // Create a hb_font.
+    hb_font_t *hb_font = hb_ft_font_create_referenced(face);
+    auto hb_font_guard = scopeGuard([&hb_font]{ hb_font_destroy(hb_font); });
+    // Shape
+    hb_shape(hb_font, buf, NULL, 0);
+    // Get the glyph and position information.
+    unsigned int glyph_count;
+    hb_glyph_info_t *glyph_info    = hb_buffer_get_glyph_infos(buf, &glyph_count);
+    hb_glyph_position_t *glyph_pos = hb_buffer_get_glyph_positions(buf, &glyph_count);
+    
+    // Iterate over each glyph.
+    for (unsigned int i = 0; i < glyph_count; i++)
     {
-        Character ch;
-        if (!get_character(face, *c, ch))
+        hb_codepoint_t glyphid  = glyph_info[i].codepoint;
+        hb_position_t x_offset  = glyph_pos[i].x_offset / 64;
+        hb_position_t y_offset  = glyph_pos[i].y_offset / 64;
+        hb_position_t x_advance = glyph_pos[i].x_advance / 64;
+        hb_position_t y_advance = glyph_pos[i].y_advance / 64;
+
+        Glyph g;
+        if (!get_glyph(face, glyphid, g))
         {
-            fprintf(stderr, "get_character %c failed\n", *c);
+            fprintf(stderr, "get_glyph %d failed\n", glyphid);
             break;
         }
 
-        float xpos = x + ch.Bearing.x * scale;
-        float ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+        float x_origin = x + g.Bearing.x * scale;
+        float y_origin = y - (g.Size.y - g.Bearing.y) * scale;
+        float x_pos = x_origin + x_offset * scale;
+        float y_pos = y_origin - y_offset * scale;
+        float w = g.Size.x * scale;
+        float h = g.Size.y * scale;
 
-        float w = ch.Size.x * scale;
-        float h = ch.Size.y * scale;
-        // update VBO for each character
+        // update VBO for each glyph
         float vertices[6][4] = {
-            { xpos,     ypos + h,   0.0f, 0.0f },            
-            { xpos,     ypos,       0.0f, 1.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
+            { x_pos,     y_pos + h,   0.0f, 0.0f },            
+            { x_pos,     y_pos,       0.0f, 1.0f },
+            { x_pos + w, y_pos,       1.0f, 1.0f },
 
-            { xpos,     ypos + h,   0.0f, 0.0f },
-            { xpos + w, ypos,       1.0f, 1.0f },
-            { xpos + w, ypos + h,   1.0f, 0.0f }           
+            { x_pos,     y_pos + h,   0.0f, 0.0f },
+            { x_pos + w, y_pos,       1.0f, 1.0f },
+            { x_pos + w, y_pos + h,   1.0f, 0.0f }           
         };
         // render glyph texture over quad
-        glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+        glBindTexture(GL_TEXTURE_2D, g.TextureID);
         // update content of VBO memory
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         // render quad
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        // now advance cursors for next glyph (note that advance is number of 1/64 pixels)
-        x += (ch.Advance >> 6) * scale; // bitshift by 6 to get value in pixels (2^6 = 64)
+
+        // advance cursors for next glyph
+        x += x_advance * scale;
+        y -= y_advance * scale;
     }
+
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
