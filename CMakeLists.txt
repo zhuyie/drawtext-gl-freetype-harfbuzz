@@ -21,6 +21,8 @@ add_subdirectory(deps/freetype)
 
 # Compile HarfBuzz
 set(HB_BUILD_SUBSET OFF CACHE BOOL " " FORCE)
+set(HB_HAVE_FREETYPE ON CACHE BOOL " " FORCE)
+set(ENV{FREETYPE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/deps/freetype")
 add_subdirectory(deps/harfbuzz)
 
 # drawtext
