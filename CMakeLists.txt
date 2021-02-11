@@ -21,7 +21,7 @@ add_subdirectory(deps/freetype)
 
 # Compile HarfBuzz
 set(HB_BUILD_SUBSET OFF CACHE BOOL " " FORCE)
-# harfbuzz's CMakeFiles.txt use FindFreetype cmake module. don't know how to use the inclusion freetype.
+# harfbuzz's CMakeLists.txt use FindFreetype cmake module. don't know how to use the inclusion freetype.
 # set(HB_HAVE_FREETYPE ON CACHE BOOL " " FORCE)
 # set(ENV{FREETYPE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/deps/freetype")
 add_subdirectory(deps/harfbuzz)
@@ -30,11 +30,10 @@ add_subdirectory(deps/harfbuzz)
 add_executable(drawtext 
     main.cpp
     scope_guard.h
-    deps/glad/src/glad.c
-    deps/harfbuzz/src/hb-ft.cc
-    )
+    deps/glad/src/glad.c)
 
 # Workaround for HarfBuzz FreeType integration
+target_sources(drawtext PUBLIC deps/harfbuzz/src/hb-ft.cc)
 set_source_files_properties(deps/harfbuzz/src/hb-ft.cc
     PROPERTIES COMPILE_DEFINITIONS HAVE_FREETYPE)
 
