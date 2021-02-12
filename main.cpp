@@ -15,6 +15,7 @@
 #include <map>
 #include <memory>
 
+#include "font.h"
 #include "scope_guard.h"
 
 static void error_callback(int error, const char* description)
@@ -168,7 +169,7 @@ bool get_glyph(FT_Face face, unsigned int glyph_index, Glyph& x)
 
 void render_text(
     GLuint shader_program, GLuint vao, GLuint vbo, int framebuffer_w, int framebuffer_h,
-    FT_Face face, const std::string& text, float x, float y, float scale, glm::vec3 color)
+    Font& font, const std::string& text, float x, float y, glm::vec3 color)
 {
     // activate corresponding render state	
     glUseProgram(shader_program);
@@ -187,11 +188,8 @@ void render_text(
     hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
     hb_buffer_set_script(buf, HB_SCRIPT_LATIN);
     hb_buffer_set_language(buf, hb_language_from_string("en", -1));
-    // Create a hb_font.
-    hb_font_t *hb_font = hb_ft_font_create_referenced(face);
-    auto hb_font_guard = scopeGuard([&hb_font]{ hb_font_destroy(hb_font); });
     // Shape
-    hb_shape(hb_font, buf, NULL, 0);
+    hb_shape(font.getHBFont(), buf, NULL, 0);
     // Get the glyph and position information.
     unsigned int glyph_count;
     hb_glyph_info_t *glyph_info    = hb_buffer_get_glyph_infos(buf, &glyph_count);
@@ -207,18 +205,18 @@ void render_text(
         hb_position_t y_advance = glyph_pos[i].y_advance / 64;
 
         Glyph g;
-        if (!get_glyph(face, glyphid, g))
+        if (!get_glyph(font.getFTFont(), glyphid, g))
         {
             fprintf(stderr, "get_glyph %d failed\n", glyphid);
             break;
         }
 
-        float x_origin = x + g.Bearing.x * scale;
-        float y_origin = y - (g.Size.y - g.Bearing.y) * scale;
-        float x_pos = x_origin + x_offset * scale;
-        float y_pos = y_origin - y_offset * scale;
-        float w = g.Size.x * scale;
-        float h = g.Size.y * scale;
+        float x_origin = x + g.Bearing.x;
+        float y_origin = y - (g.Size.y - g.Bearing.y);
+        float x_pos = x_origin + x_offset;
+        float y_pos = y_origin - y_offset;
+        float w = g.Size.x;
+        float h = g.Size.y;
 
         // update VBO for each glyph
         float vertices[6][4] = {
@@ -240,37 +238,12 @@ void render_text(
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // advance cursors for next glyph
-        x += x_advance * scale;
-        y -= y_advance * scale;
+        x += x_advance;
+        y -= y_advance;
     }
 
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-static bool create_font(FT_Library ft, const char* font_path, float size_in_points, float content_scale, FT_Face* face)
-{
-    if (FT_New_Face(ft, font_path, 0, face))
-    {
-        return false;
-    }
-#if defined(_WIN32)
-    const int logic_dpi_x = 96;
-    const int logic_dpi_y = 96;
-#elif defined(__APPLE__)
-    const int logic_dpi_x = 72;
-    const int logic_dpi_y = 72;
-#else
-    #error "not implemented"
-#endif
-    FT_Set_Char_Size(
-        *face, 
-        0,                                // same as character height
-        size_in_points*content_scale*64,  // char_height in 1/64th of points
-        logic_dpi_x,                      // horizontal device resolution
-        logic_dpi_y                       // vertical device resolution
-    );
-    return true;
 }
 
 int main(int argc, char* agrv[])
@@ -353,14 +326,20 @@ int main(int argc, char* agrv[])
     auto ft_guard = scopeGuard([&ft]{ FT_Done_FreeType(ft); });
     fprintf(stdout, "FreeType Version: %s\n", freetype_version_string(ft, version, sizeof(version)));
 
-    FT_Face font;
-    if (!create_font(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale, &font))
+    fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
+
+    Font font0(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale);
+    if (!font0.initOK())
     {
-        fprintf(stderr, "create_font failed\n");
+        fprintf(stderr, "create font0 failed\n");
         return 1;
     }
-
-    fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
+    Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 72, content_scale);
+    if (!font1.initOK())
+    {
+        fprintf(stderr, "create font1 failed\n");
+        return 1;
+    }
 
     // Event loop
     while (!glfwWindowShouldClose(window))
@@ -372,9 +351,14 @@ int main(int argc, char* agrv[])
         glClear(GL_COLOR_BUFFER_BIT);
         
         render_text(
-            shader_program, VAO, VBO, width, height, font, 
-            "This is a test.", 25.0f*content_scale, 25.0f*content_scale, 
-            1.0f, glm::vec3(1.0f, 0.f, 0.f)
+            shader_program, VAO, VBO, width, height, font0, 
+            u8"This is a test.", 25.0f*content_scale, 25.0f*content_scale, 
+            glm::vec3(1.0f, 0.f, 0.f)
+        );
+        render_text(
+            shader_program, VAO, VBO, width, height, font1, 
+            u8"天地玄黄，宇宙洪荒。", 25.0f*content_scale, 125.0f*content_scale, 
+            glm::vec3(0.f, 0.f, 1.f)
         );
 
         glfwSwapBuffers(window);
