@@ -189,7 +189,8 @@ bool get_glyph(Font& font, unsigned int glyph_index, Glyph& x)
 
 void render_text(
     GLuint shader_program, GLuint vao, GLuint vbo, int framebuffer_w, int framebuffer_h,
-    Font& font, const std::string& text, float x, float y, glm::vec3 color)
+    Font& font, const std::string& text, hb_direction_t direction, hb_script_t script, hb_language_t language,
+    float x, float y, glm::vec3 color)
 {
     // activate corresponding render state	
     glUseProgram(shader_program);
@@ -205,9 +206,9 @@ void render_text(
     // Put text in.
     hb_buffer_add_utf8(buf, text.c_str(), -1, 0, -1);
     // Set the script, language and direction of the buffer.
-    hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
-    hb_buffer_set_script(buf, HB_SCRIPT_LATIN);
-    hb_buffer_set_language(buf, hb_language_from_string("en", -1));
+    hb_buffer_set_direction(buf, direction);
+    hb_buffer_set_script(buf, script);
+    hb_buffer_set_language(buf, language);
     // Shape
     hb_shape(font.getHBFont(), buf, NULL, 0);
     // Get the glyph and position information.
@@ -348,16 +349,22 @@ int main(int argc, char* agrv[])
 
     fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
 
-    Font font0(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale, true, false);
+    Font font0(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale, false, true);
     if (!font0.initOK())
     {
         fprintf(stderr, "create font0 failed\n");
         return 1;
     }
-    Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 72, content_scale, false, true);
+    Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 72, content_scale, false, false);
     if (!font1.initOK())
     {
         fprintf(stderr, "create font1 failed\n");
+        return 1;
+    }
+    Font font2(ft, "../fonts/NotoSansArabic-Regular.ttf", 72, content_scale, true, false);
+    if (!font2.initOK())
+    {
+        fprintf(stderr, "create font2 failed\n");
         return 1;
     }
 
@@ -372,13 +379,18 @@ int main(int argc, char* agrv[])
         
         render_text(
             shader_program, VAO, VBO, width, height, font0, 
-            u8"This is a test.", 25.0f*content_scale, 25.0f*content_scale, 
-            glm::vec3(1.0f, 0.f, 0.f)
+            u8"This is a test.", HB_DIRECTION_LTR, HB_SCRIPT_LATIN, hb_language_from_string("en", -1),
+            25.0f*content_scale, 525.0f*content_scale, glm::vec3(1.0f, 0.f, 0.f)
         );
         render_text(
             shader_program, VAO, VBO, width, height, font1, 
-            u8"天地玄黄，宇宙洪荒。", 25.0f*content_scale, 125.0f*content_scale, 
-            glm::vec3(0.f, 0.f, 1.f)
+            u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_LTR, HB_SCRIPT_HAN, hb_language_from_string("zh", -1),
+            25.0f*content_scale, 450.0f*content_scale, glm::vec3(0.f, 0.f, 1.f)
+        );
+        render_text(
+            shader_program, VAO, VBO, width, height, font2, 
+            u8"أسئلة وأجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1),
+            400.0f*content_scale, 25.0f*content_scale, glm::vec3(0.f, 1.f, 0.f)
         );
 
         glfwSwapBuffers(window);
