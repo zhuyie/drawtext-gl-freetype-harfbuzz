@@ -6,6 +6,7 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_OUTLINE_H
 #include <hb.h>
 #include <hb-ft.h>
 
@@ -122,7 +123,7 @@ struct Glyph {
 typedef std::map<unsigned int, Glyph> GlyphCache;
 GlyphCache Glyphs;
 
-bool get_glyph(FT_Face face, unsigned int glyph_index, Glyph& x)
+bool get_glyph(Font& font, unsigned int glyph_index, Glyph& x)
 {
     GlyphCache::iterator iter = Glyphs.find(glyph_index);
     if (iter != Glyphs.end())
@@ -131,8 +132,27 @@ bool get_glyph(FT_Face face, unsigned int glyph_index, Glyph& x)
         return true;
     }
 
-    // load glyph 
-    if (FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER))
+    // load glyph
+    FT_Face face = font.getFTFont();
+    if (FT_Load_Glyph(face, glyph_index, FT_LOAD_DEFAULT))
+    {
+        return false;
+    }
+    if (font.synthesisItalic())
+    {
+        // horizontal shear
+        FT_Matrix matrix;
+        matrix.xx = 0x10000L;
+        matrix.xy = 0.3 * 0x10000L;
+        matrix.yx = 0;
+        matrix.yy = 0x10000L;
+        FT_Outline_Transform(&face->glyph->outline, &matrix);
+    }
+    if (font.synthesisBold())
+    {
+        FT_Outline_Embolden(&face->glyph->outline, font.getSize() * 0.04 * 64);
+    }
+    if (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL))
     {
         return false;
     }
@@ -205,7 +225,7 @@ void render_text(
         hb_position_t y_advance = glyph_pos[i].y_advance / 64;
 
         Glyph g;
-        if (!get_glyph(font.getFTFont(), glyphid, g))
+        if (!get_glyph(font, glyphid, g))
         {
             fprintf(stderr, "get_glyph %d failed\n", glyphid);
             break;
@@ -328,13 +348,13 @@ int main(int argc, char* agrv[])
 
     fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
 
-    Font font0(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale);
+    Font font0(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale, true, false);
     if (!font0.initOK())
     {
         fprintf(stderr, "create font0 failed\n");
         return 1;
     }
-    Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 72, content_scale);
+    Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 72, content_scale, false, true);
     if (!font1.initOK())
     {
         fprintf(stderr, "create font1 failed\n");
