@@ -143,14 +143,14 @@ bool get_glyph(Font& font, unsigned int glyph_index, Glyph& x)
         // horizontal shear
         FT_Matrix matrix;
         matrix.xx = 0x10000L;
-        matrix.xy = 0.3 * 0x10000L;
+        matrix.xy = (FT_Fixed)(0.3 * 0x10000L);
         matrix.yx = 0;
         matrix.yy = 0x10000L;
         FT_Outline_Transform(&face->glyph->outline, &matrix);
     }
     if (font.synthesisBold())
     {
-        FT_Outline_Embolden(&face->glyph->outline, font.getSize() * 0.04 * 64);
+        FT_Outline_Embolden(&face->glyph->outline, (FT_Pos)(font.getSize() * 0.04 * 64));
     }
     if (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL))
     {
@@ -236,8 +236,8 @@ void render_text(
         float y_origin = y - (g.Size.y - g.Bearing.y);
         float x_pos = x_origin + x_offset;
         float y_pos = y_origin - y_offset;
-        float w = g.Size.x;
-        float h = g.Size.y;
+        float w = (float)g.Size.x;
+        float h = (float)g.Size.y;
 
         // update VBO for each glyph
         float vertices[6][4] = {

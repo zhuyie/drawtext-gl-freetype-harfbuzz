@@ -76,10 +76,10 @@ private:
     #endif
         FT_Set_Char_Size(
             ftFont_, 
-            0,                         // same as character height
-            fontSize*contentScale*64,  // char_height in 1/64th of points
-            logic_dpi_x,               // horizontal device resolution
-            logic_dpi_y                // vertical device resolution
+            0,                                       // same as character height
+            (FT_F26Dot6)(fontSize*contentScale*64),  // char_height in 1/64th of points
+            logic_dpi_x,                             // horizontal device resolution
+            logic_dpi_y                              // vertical device resolution
         );
 
         hbFont_ = hb_ft_font_create_referenced(ftFont_);
