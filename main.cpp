@@ -117,7 +117,7 @@ static bool create_shader_program(GLuint& programID)
 struct Glyph {
     unsigned int TextureID;  // ID handle of the glyph texture
     glm::ivec2   Size;       // Size of glyph
-    glm::ivec2   Bearing;    // Offset from baseline to left/top of glyph
+    glm::ivec2   Bearing;    // Offset from horizontal layout origin to left/top of glyph
 };
 
 typedef std::map<unsigned int, Glyph> GlyphCache;
@@ -156,6 +156,7 @@ bool get_glyph(Font& font, unsigned int glyph_index, Glyph& x)
     {
         return false;
     }
+
     // generate texture
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -235,7 +236,7 @@ void render_text(
         float x_origin = x + g.Bearing.x;
         float y_origin = y - (g.Size.y - g.Bearing.y);
         float x_pos = x_origin + x_offset;
-        float y_pos = y_origin - y_offset;
+        float y_pos = y_origin + y_offset;
         float w = (float)g.Size.x;
         float h = (float)g.Size.y;
 
@@ -260,7 +261,7 @@ void render_text(
 
         // advance cursors for next glyph
         x += x_advance;
-        y -= y_advance;
+        y += y_advance;
     }
 
     glBindVertexArray(0);
@@ -349,19 +350,19 @@ int main(int argc, char* agrv[])
 
     fprintf(stdout, "HarfBuzz Version: %s\n", hb_version_string());
 
-    Font font0(ft, "../fonts/NotoSans-Regular.ttf", 72, content_scale, false, true);
+    Font font0(ft, "../fonts/NotoSans-Regular.ttf", 56, content_scale, false, true);
     if (!font0.initOK())
     {
         fprintf(stderr, "create font0 failed\n");
         return 1;
     }
-    Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 72, content_scale, false, false);
+    Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 32, content_scale, false, false);
     if (!font1.initOK())
     {
         fprintf(stderr, "create font1 failed\n");
         return 1;
     }
-    Font font2(ft, "../fonts/NotoSansArabic-Regular.ttf", 72, content_scale, true, false);
+    Font font2(ft, "../fonts/NotoSansArabic-Regular.ttf", 56, content_scale, true, false);
     if (!font2.initOK())
     {
         fprintf(stderr, "create font2 failed\n");
@@ -384,8 +385,8 @@ int main(int argc, char* agrv[])
         );
         render_text(
             shader_program, VAO, VBO, width, height, font1, 
-            u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_LTR, HB_SCRIPT_HAN, hb_language_from_string("zh", -1),
-            25.0f*content_scale, 450.0f*content_scale, glm::vec3(0.f, 0.f, 1.f)
+            u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_TTB, HB_SCRIPT_HAN, hb_language_from_string("zh", -1),
+            325.0f*content_scale, 500.0f*content_scale, glm::vec3(0.f, 0.f, 1.f)
         );
         render_text(
             shader_program, VAO, VBO, width, height, font2, 
