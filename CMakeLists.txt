@@ -38,6 +38,11 @@ target_sources(drawtext PUBLIC deps/harfbuzz/src/hb-ft.cc)
 set_source_files_properties(deps/harfbuzz/src/hb-ft.cc
     PROPERTIES COMPILE_DEFINITIONS HAVE_FREETYPE)
 
+# https://docs.microsoft.com/en-us/cpp/build/reference/utf-8-set-source-and-executable-character-sets-to-utf-8?view=msvc-160
+if (MSVC)
+    target_compile_options(drawtext PRIVATE /source-charset:utf-8)
+endif()
+
 target_include_directories(drawtext
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include"
     PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/deps/glfw/include"
