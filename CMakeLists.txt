@@ -33,6 +33,8 @@ add_executable(drawtext
     scope_guard.h
     skyline_binpack.h
     skyline_binpack.cpp
+    texture_atlas.h
+    texture_atlas.cpp
     deps/glad/src/glad.c)
 
 # Workaround for HarfBuzz FreeType integration
