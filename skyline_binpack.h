@@ -9,6 +9,8 @@
 
 #include <vector>
 
+namespace binpack {
+
 struct Rect
 {
 	int x;
@@ -17,8 +19,7 @@ struct Rect
 	int height;
 };
 
-/** Implements bin packing algorithms that use the SKYLINE data structure to store the bin contents. Uses
-	GuillotineBinPack as the waste map. */
+/** Implements bin packing algorithms that use the SKYLINE data structure to store the bin contents. */
 class SkylineBinPack
 {
 public:
@@ -32,7 +33,7 @@ public:
 	/// you need to restart with a new bin.
 	void Init(int binWidth, int binHeight);
 
-	/// Inserts a single rectangle into the bin, possibly rotated.
+	/// Inserts a single rectangle into the bin.
 	Rect Insert(int width, int height);
 
 	/// Computes the ratio of used surface area to the total bin area.
@@ -70,3 +71,5 @@ private:
 	/// Merges all skyline nodes that are at the same level.
 	void MergeSkylines();
 };
+
+}  // End of namespace binpack
