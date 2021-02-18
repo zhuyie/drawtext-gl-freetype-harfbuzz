@@ -33,6 +33,7 @@ bool TextureAtlas::Init(uint16_t width, uint16_t height)
     // generate texture
     glGenTextures(1, &texture_);
     glBindTexture(GL_TEXTURE_2D, texture_);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage2D(
         GL_TEXTURE_2D,
         0,
@@ -68,20 +69,15 @@ bool TextureAtlas::AddRegion(uint16_t width, uint16_t height, const uint8_t *dat
 
     for (uint16_t i = 0; i < height; i++)
     {
-        memcpy(data_ + ((y + i) * width_ + x), data + i * width, width);
+        memcpy(data_ + ((r.y + i) * width_ + r.x), data + i * width, width);
     }
+
+    glBindTexture(GL_TEXTURE_2D, texture_);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, r.x, r.y, width, height, GL_RED, GL_UNSIGNED_BYTE, data);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
     x = r.x;
     y = r.y;
     
-    return true;
-}
-
-bool TextureAtlas::Update()
-{
-    glBindTexture(GL_TEXTURE_2D, texture_);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width_, height_, GL_RED, GL_UNSIGNED_BYTE, data_);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
     return true;
 }

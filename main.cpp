@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "font.h"
+#include "texture_atlas.h"
 #include "scope_guard.h"
 
 static void error_callback(int error, const char* description)
@@ -114,18 +115,23 @@ static bool create_shader_program(GLuint& programID)
     return true;
 }
 
+typedef std::pair<unsigned int, unsigned int> GlyphKey;
+
 struct Glyph {
-    unsigned int TextureID;  // ID handle of the glyph texture
-    glm::ivec2   Size;       // Size of glyph
-    glm::ivec2   Bearing;    // Offset from horizontal layout origin to left/top of glyph
+    glm::ivec2 Size;       // Size of glyph
+    glm::ivec2 Bearing;    // Offset from horizontal layout origin to left/top of glyph
+    glm::ivec2 TexOffset;  // Offset of glyph in texture atalas
 };
 
-typedef std::map<unsigned int, Glyph> GlyphCache;
+typedef std::map<GlyphKey, Glyph> GlyphCache;
 GlyphCache Glyphs;
+
+TextureAtlas TexAltas;
 
 bool get_glyph(Font& font, unsigned int glyph_index, Glyph& x)
 {
-    GlyphCache::iterator iter = Glyphs.find(glyph_index);
+    GlyphKey key = GlyphKey{ font.getID(), glyph_index };
+    GlyphCache::iterator iter = Glyphs.find(key);
     if (iter != Glyphs.end())
     {
         x = iter->second;
@@ -157,33 +163,26 @@ bool get_glyph(Font& font, unsigned int glyph_index, Glyph& x)
         return false;
     }
 
-    // generate texture
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(
-        GL_TEXTURE_2D,
-        0,
-        GL_RED,
-        face->glyph->bitmap.width,
-        face->glyph->bitmap.rows,
-        0,
-        GL_RED,
-        GL_UNSIGNED_BYTE,
-        face->glyph->bitmap.buffer
-    );
-    // set texture options
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    uint16_t texOffsetX = 0, texOffsetY = 0;
+    if (face->glyph->bitmap.width > 0 && face->glyph->bitmap.rows > 0)
+    {
+        if (!TexAltas.AddRegion(face->glyph->bitmap.width, 
+                                face->glyph->bitmap.rows, 
+                                face->glyph->bitmap.buffer, 
+                                texOffsetX, 
+                                texOffsetY))
+        {
+            return false;
+        }
+    }
+
     // now store Glyph for later use
     x = Glyph {
-        texture, 
         glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
-        glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top)
+        glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
+        glm::ivec2(texOffsetX, texOffsetY)
     };
-    Glyphs.insert(GlyphCache::value_type(glyph_index, x));
+    Glyphs.insert(GlyphCache::value_type(key, x));
 
     return true;
 }
@@ -199,6 +198,7 @@ void render_text(
     glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniform3f(glGetUniformLocation(shader_program, "textColor"), color.x, color.y, color.z);
     glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, TexAltas.TextureID());
     glBindVertexArray(vao);
 
     // Create a hb_buffer.
@@ -233,31 +233,37 @@ void render_text(
             break;
         }
 
-        float x_origin = x + g.Bearing.x;
-        float y_origin = y - (g.Size.y - g.Bearing.y);
-        float x_pos = x_origin + x_offset;
-        float y_pos = y_origin + y_offset;
-        float w = (float)g.Size.x;
-        float h = (float)g.Size.y;
+        if (g.Size.x > 0 && g.Size.y > 0)
+        {
+            float x_origin = x + g.Bearing.x;
+            float y_origin = y - (g.Size.y - g.Bearing.y);
+            float x_pos = x_origin + x_offset;
+            float y_pos = y_origin + y_offset;
+            float w = (float)g.Size.x;
+            float h = (float)g.Size.y;
 
-        // update VBO for each glyph
-        float vertices[6][4] = {
-            { x_pos,     y_pos + h,   0.0f, 0.0f },            
-            { x_pos,     y_pos,       0.0f, 1.0f },
-            { x_pos + w, y_pos,       1.0f, 1.0f },
+            float tex_x = g.TexOffset.x / (float)TexAltas.Width();
+            float tex_y = g.TexOffset.y / (float)TexAltas.Height();
+            float tex_w = w / (float)TexAltas.Width();
+            float tex_h = h / (float)TexAltas.Height();
 
-            { x_pos,     y_pos + h,   0.0f, 0.0f },
-            { x_pos + w, y_pos,       1.0f, 1.0f },
-            { x_pos + w, y_pos + h,   1.0f, 0.0f }           
-        };
-        // render glyph texture over quad
-        glBindTexture(GL_TEXTURE_2D, g.TextureID);
-        // update content of VBO memory
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        // render quad
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+            // update VBO for each glyph
+            float vertices[6][4] = {
+                { x_pos,     y_pos + h,   tex_x,         tex_y         },
+                { x_pos,     y_pos,       tex_x,         tex_y + tex_h },
+                { x_pos + w, y_pos,       tex_x + tex_w, tex_y + tex_h },
+
+                { x_pos,     y_pos + h,   tex_x,         tex_y         },
+                { x_pos + w, y_pos,       tex_x + tex_w, tex_y + tex_h },
+                { x_pos + w, y_pos + h,   tex_x + tex_w, tex_y         }
+            };
+            // update content of VBO memory
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); 
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            // render quad
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
 
         // advance cursors for next glyph
         x += x_advance;
@@ -366,6 +372,12 @@ int main(int argc, char* agrv[])
     if (!font2.initOK())
     {
         fprintf(stderr, "create font2 failed\n");
+        return 1;
+    }
+
+    if (!TexAltas.Init(1024, 1024))
+    {
+        fprintf(stderr, "TextureAltas init failed\n");
         return 1;
     }
 

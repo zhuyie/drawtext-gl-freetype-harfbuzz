@@ -13,7 +13,10 @@ public:
     bool Init(uint16_t width, uint16_t height);
     
     bool AddRegion(uint16_t width, uint16_t height, const uint8_t *data, uint16_t &x, uint16_t &y);
-    bool Update();
+
+    uint16_t Width() const { return width_; }
+    uint16_t Height() const { return height_; }
+    unsigned int TextureID() const { return texture_; }
 
 private:
     uint16_t width_;
