@@ -12,6 +12,7 @@
 
 class Font
 {
+    unsigned int ID_;
     FT_Face ftFont_;
     hb_font_t* hbFont_;
     float fontSize_;
@@ -41,17 +42,18 @@ public:
     }
     bool initOK() { return initOK_; }
     
-    FT_Face getFTFont() { return ftFont_; }
-    hb_font_t* getHBFont() { return hbFont_; }
-    float getSize() { return fontSize_; }
-    float getContentScale() { return contentScale_; }
-    bool getBold() { return bold_; }
-    bool getItalic() { return italic_; }
-    bool synthesisBold()
+    unsigned int getID() const { return ID_; }
+    FT_Face getFTFont() const { return ftFont_; }
+    hb_font_t* getHBFont() const { return hbFont_; }
+    float getSize() const { return fontSize_; }
+    float getContentScale() const { return contentScale_; }
+    bool getBold() const { return bold_; }
+    bool getItalic() const { return italic_; }
+    bool synthesisBold() const
     { 
         return (bold_ && !(ftFont_->style_flags & FT_STYLE_FLAG_BOLD));
     }
-    bool synthesisItalic()
+    bool synthesisItalic() const
     {
         return (italic_ && !(ftFont_->style_flags & FT_STYLE_FLAG_ITALIC));
     }
@@ -85,12 +87,18 @@ private:
         hbFont_ = hb_ft_font_create_referenced(ftFont_);
 
         ftFont_guard.dismiss();
+        ID_ = genID();
         fontSize_ = fontSize;
         contentScale_ = contentScale;
         bold_ = bold;
         italic_ = italic;
         initOK_ = true;
         return;
+    }
+    unsigned int genID()
+    {
+        static unsigned int s_ID = 0;
+        return (++s_ID);
     }
 };
 
