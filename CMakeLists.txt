@@ -37,6 +37,8 @@ add_executable(drawtext
     texture_atlas.cpp
     shader.h
     shader.cpp
+    text_render.h
+    text_render.cpp
     deps/glad/src/glad.c)
 
 # Workaround for HarfBuzz FreeType integration
