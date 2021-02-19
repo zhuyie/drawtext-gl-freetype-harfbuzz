@@ -1,6 +1,8 @@
 #ifndef __SCOPE_GUARD_H__
 #define __SCOPE_GUARD_H__
 
+#include <algorithm>
+
 // ScopeGuard for C++11, Andrei Alexandrescu
 // https://skydrive.live.com/view.aspx?resid=F1B8FF18A2AEC5C5!1158&app=WordPdf&authkey=!APo6bfP5sJ8EmH4
 template<class Fun>

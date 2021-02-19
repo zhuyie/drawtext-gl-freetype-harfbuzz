@@ -16,6 +16,7 @@
 #include <map>
 #include <memory>
 
+#include "shader.h"
 #include "font.h"
 #include "texture_atlas.h"
 #include "scope_guard.h"
@@ -65,55 +66,6 @@ const char* fragment_shader_string =
 "    vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, TexCoords).r);\n"
 "    color = vec4(textColor, 1.0) * sampled;\n"
 "}\n";
-
-static bool create_shader_program(GLuint& programID)
-{
-    int success;
-    char info_log[1024];
-
-    // vertex shader
-    GLuint vertex = glCreateShader(GL_VERTEX_SHADER);
-    auto vertex_guard = scopeGuard([&vertex]{ glDeleteShader(vertex); });
-    glShaderSource(vertex, 1, &vertex_shader_string, NULL);
-    glCompileShader(vertex);
-    glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vertex, 1024, NULL, info_log);
-        fprintf(stderr, "create_shader_program: vertex shader compile failed: %s\n", info_log);
-        return false;
-    }
-
-    // fragment Shader
-    GLuint fragment = glCreateShader(GL_FRAGMENT_SHADER);
-    auto fragment_guard = scopeGuard([&fragment]{ glDeleteShader(fragment); });
-    glShaderSource(fragment, 1, &fragment_shader_string, NULL);
-    glCompileShader(fragment);
-    glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(fragment, 1024, NULL, info_log);
-        fprintf(stderr, "create_shader_program: fragment shader compile failed: %s\n", info_log);
-        return false;
-    }
-    
-    // shader Program
-    programID = glCreateProgram();
-    auto program_guard = scopeGuard([&programID]{ glDeleteProgram(programID); });
-    glAttachShader(programID, vertex);
-    glAttachShader(programID, fragment);
-    glLinkProgram(programID);
-    glGetProgramiv(programID, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(programID, 1024, NULL, info_log);
-        fprintf(stderr, "create_shader_program: link failed: %s\n", info_log);
-        return false;
-    }
-    
-    program_guard.dismiss();
-    return true;
-}
 
 typedef std::pair<unsigned int, unsigned int> GlyphKey;
 
@@ -188,15 +140,15 @@ bool get_glyph(Font& font, unsigned int glyph_index, Glyph& x)
 }
 
 void render_text(
-    GLuint shader_program, GLuint vao, GLuint vbo, int framebuffer_w, int framebuffer_h,
+    ShaderProgram &shader, GLuint vao, GLuint vbo, int framebuffer_w, int framebuffer_h,
     Font& font, const std::string& text, hb_direction_t direction, hb_script_t script, hb_language_t language,
     float x, float y, glm::vec3 color)
 {
     // activate corresponding render state	
-    glUseProgram(shader_program);
+    shader.Use(true);
     glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(framebuffer_w), 0.0f, static_cast<float>(framebuffer_h));
-    glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-    glUniform3f(glGetUniformLocation(shader_program, "textColor"), color.x, color.y, color.z);
+    glUniformMatrix4fv(shader.GetUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform3f(shader.GetUniformLocation("textColor"), color.x, color.y, color.z);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, TexAltas.TextureID());
     glBindVertexArray(vao);
@@ -272,6 +224,7 @@ void render_text(
 
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    shader.Use(false);
 }
 
 int main(int argc, char* agrv[])
@@ -320,9 +273,11 @@ int main(int argc, char* agrv[])
     fprintf(stdout, "OpenGL Version: %s\n", opengl_version_string(version, sizeof(version)));
 
     // Create shader program
-    GLuint shader_program = 0;
-    if (!create_shader_program(shader_program))
+    ShaderProgram shader;
+    std::string errorLog;
+    if (!shader.Init(vertex_shader_string, fragment_shader_string, errorLog))
     {
+        fprintf(stderr, "ShaderProgram Init failed: %s\n", errorLog.c_str());
         return 1;
     }
     
@@ -391,17 +346,17 @@ int main(int argc, char* agrv[])
         glClear(GL_COLOR_BUFFER_BIT);
         
         render_text(
-            shader_program, VAO, VBO, width, height, font0, 
+            shader, VAO, VBO, width, height, font0, 
             u8"This is a test.", HB_DIRECTION_LTR, HB_SCRIPT_LATIN, hb_language_from_string("en", -1),
             25.0f*content_scale, 525.0f*content_scale, glm::vec3(1.0f, 0.f, 0.f)
         );
         render_text(
-            shader_program, VAO, VBO, width, height, font1, 
+            shader, VAO, VBO, width, height, font1, 
             u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_TTB, HB_SCRIPT_HAN, hb_language_from_string("zh", -1),
             325.0f*content_scale, 500.0f*content_scale, glm::vec3(0.f, 0.f, 1.f)
         );
         render_text(
-            shader_program, VAO, VBO, width, height, font2, 
+            shader, VAO, VBO, width, height, font2, 
             u8"أسئلة وأجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1),
             400.0f*content_scale, 25.0f*content_scale, glm::vec3(0.f, 1.f, 0.f)
         );
