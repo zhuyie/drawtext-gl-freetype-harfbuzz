@@ -129,7 +129,6 @@ int main(int argc, char* agrv[])
         glClear(GL_COLOR_BUFFER_BIT);
 
         render.Begin(width, height);
-
         render.DrawText(
             font0, 
             u8"This is a test.", HB_DIRECTION_LTR, HB_SCRIPT_LATIN, hb_language_from_string("en", -1),
@@ -142,10 +141,9 @@ int main(int argc, char* agrv[])
         );
         render.DrawText(
             font2, 
-            u8"أسئلة وأجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1),
+            u8"أسئلة و أجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1),
             400.0f*content_scale, 25.0f*content_scale, glm::vec3(0.f, 1.f, 0.f)
         );
-
         render.End();
 
         glfwSwapBuffers(window);
