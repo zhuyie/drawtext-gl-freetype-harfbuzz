@@ -101,19 +101,19 @@ int main(int argc, char* agrv[])
 
     // Create fonts
     Font font0(ft, "../fonts/NotoSans-Regular.ttf", 56, content_scale, false, true);
-    if (!font0.initOK())
+    if (!font0.Ok())
     {
         fprintf(stderr, "create font0 failed\n");
         return 1;
     }
     Font font1(ft, "../fonts/NotoSerifSC-Regular.otf", 32, content_scale, false, false);
-    if (!font1.initOK())
+    if (!font1.Ok())
     {
         fprintf(stderr, "create font1 failed\n");
         return 1;
     }
     Font font2(ft, "../fonts/NotoSansArabic-Regular.ttf", 56, content_scale, true, false);
-    if (!font2.initOK())
+    if (!font2.Ok())
     {
         fprintf(stderr, "create font2 failed\n");
         return 1;

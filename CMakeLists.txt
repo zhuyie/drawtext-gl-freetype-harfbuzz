@@ -29,8 +29,9 @@ add_subdirectory(deps/harfbuzz)
 # drawtext
 add_executable(drawtext 
     main.cpp
-    font.h
     scope_guard.h
+    font.h
+    font.cpp
     skyline_binpack.h
     skyline_binpack.cpp
     texture_atlas.h

@@ -1,4 +1,5 @@
 #include "text_render.h"
+#include "scope_guard.h"
 
 #include <glad/glad.h>
 #include <ft2build.h>
