@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <functional>
 
 static void error_callback(int error, const char* description)
 {
@@ -32,6 +33,14 @@ static const char* freetype_version_string(FT_Library library, char* buf, size_t
     FT_Library_Version(library, &major, &minor, &patch);
     snprintf(buf, buf_size, "%d.%d.%d", major, minor, patch);
     return buf;
+}
+
+std::function<void(GLFWwindow*)> draw;
+
+static void window_refresh_callback(GLFWwindow* window)
+{
+    draw(window);
+    glfwSwapBuffers(window);
 }
 
 int main(int argc, char* agrv[])
@@ -66,6 +75,7 @@ int main(int argc, char* agrv[])
         fprintf(stderr, "glfwCreateWindow failed\n");
         return 1;
     }
+    glfwSetWindowRefreshCallback(window, window_refresh_callback);
     glfwMakeContextCurrent(window);
 
     float content_scale;
@@ -119,8 +129,7 @@ int main(int argc, char* agrv[])
         return 1;
     }
 
-    // Event loop
-    while (!glfwWindowShouldClose(window))
+    draw = [&render, &font0, &font1, &font2, &content_scale](GLFWwindow* window)
     {
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
@@ -145,7 +154,12 @@ int main(int argc, char* agrv[])
             400.0f*content_scale, 25.0f*content_scale, glm::vec3(0.f, 1.f, 0.f)
         );
         render.End();
+    };
 
+    // Event loop
+    while (!glfwWindowShouldClose(window))
+    {
+        draw(window);
         glfwSwapBuffers(window);
 
         glfwWaitEvents();
