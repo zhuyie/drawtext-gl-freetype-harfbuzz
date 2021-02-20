@@ -65,7 +65,6 @@ bool TextRender::Init()
     glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
     if (!textureAltas_.Init(1024, 1024))
@@ -88,7 +87,6 @@ void TextRender::Begin(int fbWidth, int fbHeight)
     glUniformMatrix4fv(shader_.GetUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
     glBindVertexArray(vao_);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
 }
 
 void TextRender::DrawText(Font& font, 
@@ -139,27 +137,25 @@ void TextRender::DrawText(Font& font,
 
         if (g.Size.x > 0 && g.Size.y > 0)
         {
-            float x_origin = x + g.Bearing.x;
-            float y_origin = y - (g.Size.y - g.Bearing.y);
-            float x_pos = x_origin + x_offset;
-            float y_pos = y_origin + y_offset;
-            float w = (float)g.Size.x;
-            float h = (float)g.Size.y;
+            float glyph_x = x + g.Bearing.x + x_offset;
+            float glyph_y = y - (g.Size.y - g.Bearing.y) + y_offset;
+            float glyph_w = (float)g.Size.x;
+            float glyph_h = (float)g.Size.y;
 
             float tex_x = g.TexOffset.x / (float)textureAltas_.Width();
             float tex_y = g.TexOffset.y / (float)textureAltas_.Height();
-            float tex_w = w / (float)textureAltas_.Width();
-            float tex_h = h / (float)textureAltas_.Height();
+            float tex_w = glyph_w / (float)textureAltas_.Width();
+            float tex_h = glyph_h / (float)textureAltas_.Height();
 
             // update VBO for each glyph
             float vertices[6][4] = {
-                { x_pos,     y_pos + h,   tex_x,         tex_y         },
-                { x_pos,     y_pos,       tex_x,         tex_y + tex_h },
-                { x_pos + w, y_pos,       tex_x + tex_w, tex_y + tex_h },
+                { glyph_x,           glyph_y + glyph_h, tex_x,         tex_y         },
+                { glyph_x,           glyph_y,           tex_x,         tex_y + tex_h },
+                { glyph_x + glyph_w, glyph_y,           tex_x + tex_w, tex_y + tex_h },
 
-                { x_pos,     y_pos + h,   tex_x,         tex_y         },
-                { x_pos + w, y_pos,       tex_x + tex_w, tex_y + tex_h },
-                { x_pos + w, y_pos + h,   tex_x + tex_w, tex_y         }
+                { glyph_x,           glyph_y + glyph_h, tex_x,         tex_y         },
+                { glyph_x + glyph_w, glyph_y,           tex_x + tex_w, tex_y + tex_h },
+                { glyph_x + glyph_w, glyph_y + glyph_h, tex_x + tex_w, tex_y         }
             };
             // update content of VBO memory
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); 
@@ -177,7 +173,6 @@ void TextRender::DrawText(Font& font,
 
 void TextRender::End()
 {
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
     shader_.Use(false);
