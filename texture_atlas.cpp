@@ -61,6 +61,11 @@ bool TextureAtlas::AddRegion(uint16_t width, uint16_t height, const uint8_t *dat
     assert(height > 0);
     assert(data != nullptr);
 
+    assert(width_ > 0);
+    assert(height_ > 0);
+    assert(data_ != nullptr);
+    assert(texture_ != 0);
+
     binpack::Rect r = binPacker_.Insert(width, height);
     if (r.height <= 0)
     {
@@ -80,4 +85,20 @@ bool TextureAtlas::AddRegion(uint16_t width, uint16_t height, const uint8_t *dat
     y = r.y;
     
     return true;
+}
+
+void TextureAtlas::Clear()
+{
+    assert(width_ > 0);
+    assert(height_ > 0);
+    assert(data_ != nullptr);
+    assert(texture_ != 0);
+
+    binPacker_.Init(width_, height_);
+
+    memset(data_, 0, width_ * height_ * 1 * sizeof(uint8_t));
+
+    glBindTexture(GL_TEXTURE_2D, texture_);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width_, height_, GL_RED, GL_UNSIGNED_BYTE, data_);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
