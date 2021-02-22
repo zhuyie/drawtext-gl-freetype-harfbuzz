@@ -12,6 +12,8 @@
 
 #include <string>
 #include <map>
+#include <vector>
+#include <memory>
 
 class TextRender
 {
@@ -20,22 +22,31 @@ class TextRender
     struct Glyph {
         glm::ivec2 Size;       // Size of glyph
         glm::ivec2 Bearing;    // Offset from horizontal layout origin to left/top of glyph
-        glm::ivec2 TexOffset;  // Offset of glyph in texture atalas
+        glm::ivec2 TexOffset;  // Offset of glyph in texture atlas
+        int TexIdx;            // Texture atlas index
+        unsigned int TexGen;   // Texture atlas generation
     };
 
     typedef std::map<GlyphKey, Glyph> GlyphCache;
 
+    typedef std::vector<std::unique_ptr<TextureAtlas>> TexVector;
+    typedef std::vector<unsigned int> TexGenVector;
+
     ShaderProgram shader_;
     unsigned int vao_;
     unsigned int vbo_;
-    TextureAtlas textureAltas_;
+    TexVector tex_;
+    TexGenVector texGen_;
+    uint64_t texReq_;
+    uint64_t texHit_;
+    uint64_t texEvict_;
     GlyphCache glyphs_;
 
 public:
     TextRender();
     ~TextRender();
 
-    bool Init();
+    bool Init(int numTextureAltas);
 
     void Begin(int fbWidth, int fbHeight);
 
@@ -50,8 +61,12 @@ public:
 
     void End();
 
+    void PrintStats();
+
 private:
     bool getGlyph(Font& font, unsigned int glyph_index, Glyph& x);
+    bool addToTextureAtlas(uint16_t width, uint16_t height, const uint8_t *data, 
+                           int &tex_idx, unsigned int &tex_gen, uint16_t &tex_x, uint16_t &tex_y);
 };
 
 #endif // !__TEXT_RENDER_H__

@@ -6,6 +6,10 @@
 #include FT_FREETYPE_H
 #include FT_OUTLINE_H
 
+#include <algorithm>
+#include <cstdlib>
+#include <cstdio>
+
 //------------------------------------------------------------------------------
 
 static const char* vertex_shader_string = R"(
@@ -37,10 +41,13 @@ void main()
 }
 )";
 
+const int TextureAtlasWidth  = 1024;
+const int TextureAtlasHeight = 1024;
+
 //------------------------------------------------------------------------------
 
 TextRender::TextRender()
-: vao_(0), vbo_(0)
+: vao_(0), vbo_(0), texReq_(0), texHit_(0), texEvict_(0)
 {
 }
 
@@ -50,8 +57,10 @@ TextRender::~TextRender()
     glDeleteVertexArrays(1, &vao_);
 }
 
-bool TextRender::Init()
+bool TextRender::Init(int numTextureAtlas)
 {
+    assert(numTextureAtlas > 0 && numTextureAtlas <= 16);
+
     std::string errorLog;
     if (!shader_.Init(vertex_shader_string, fragment_shader_string, errorLog))
     {
@@ -67,9 +76,15 @@ bool TextRender::Init()
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
     glBindVertexArray(0);
 
-    if (!textureAltas_.Init(1024, 1024))
+    for (int i = 0; i < numTextureAtlas; i++)
     {
-        return false;
+        std::unique_ptr<TextureAtlas> t(new TextureAtlas);
+        if (!t->Init(TextureAtlasWidth, TextureAtlasHeight))
+        {
+            return false;
+        }
+        tex_.push_back(std::move(t));
+        texGen_.push_back(0);
     }
 
     return true;
@@ -101,7 +116,6 @@ void TextRender::DrawText(Font& font,
     glUniform3f(shader_.GetUniformLocation("textColor"), color.x, color.y, color.z);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, textureAltas_.TextureID());
 
     // Create a hb_buffer.
     hb_buffer_t *buf = hb_buffer_create();
@@ -137,15 +151,18 @@ void TextRender::DrawText(Font& font,
 
         if (g.Size.x > 0 && g.Size.y > 0)
         {
+            TextureAtlas *t = tex_[g.TexIdx].get();
+            glBindTexture(GL_TEXTURE_2D, t->TextureID());
+
             float glyph_x = x + g.Bearing.x + x_offset;
             float glyph_y = y - (g.Size.y - g.Bearing.y) + y_offset;
             float glyph_w = (float)g.Size.x;
             float glyph_h = (float)g.Size.y;
 
-            float tex_x = g.TexOffset.x / (float)textureAltas_.Width();
-            float tex_y = g.TexOffset.y / (float)textureAltas_.Height();
-            float tex_w = glyph_w / (float)textureAltas_.Width();
-            float tex_h = glyph_h / (float)textureAltas_.Height();
+            float tex_x = g.TexOffset.x / (float)t->Width();
+            float tex_y = g.TexOffset.y / (float)t->Height();
+            float tex_w = glyph_w / (float)t->Width();
+            float tex_h = glyph_h / (float)t->Height();
 
             // update VBO for each glyph
             float vertices[6][4] = {
@@ -178,6 +195,18 @@ void TextRender::End()
     shader_.Use(false);
 }
 
+void TextRender::PrintStats()
+{
+    fprintf(stdout, "\n");
+    fprintf(stdout, "----glyph texture cache stats----\n");
+    fprintf(stdout, "texture atlas size: %d, %d\n", TextureAtlasWidth, TextureAtlasHeight);
+    fprintf(stdout, "texture atlas count: %d\n", (int)tex_.size());
+    fprintf(stdout, "texture atlas evict: %llu\n", texEvict_);
+    fprintf(stdout, "request: %llu\n", texReq_);
+    fprintf(stdout, "hit    : %llu (%.2f%%)\n", texHit_, (double)texHit_ / texReq_ * 100);
+    fprintf(stdout, "\n");
+}
+
 bool TextRender::getGlyph(Font& font, unsigned int glyph_index, Glyph& x)
 {
     GlyphKey key = GlyphKey{ font.getID(), glyph_index };
@@ -185,7 +214,16 @@ bool TextRender::getGlyph(Font& font, unsigned int glyph_index, Glyph& x)
     if (iter != glyphs_.end())
     {
         x = iter->second;
-        return true;
+        if (x.TexIdx < 0)
+        {
+            return true;
+        }
+        else if (x.TexGen == texGen_[x.TexIdx])  // check texture atlas generation
+        {
+            texReq_++;
+            texHit_++;
+            return true;
+        }
     }
 
     // load glyph
@@ -213,26 +251,68 @@ bool TextRender::getGlyph(Font& font, unsigned int glyph_index, Glyph& x)
         return false;
     }
 
+    int texIdx = -1;
+    unsigned int texGen = 0;
     uint16_t texOffsetX = 0, texOffsetY = 0;
     if (face->glyph->bitmap.width > 0 && face->glyph->bitmap.rows > 0)
     {
-        if (!textureAltas_.AddRegion(face->glyph->bitmap.width, 
-                                     face->glyph->bitmap.rows, 
-                                     face->glyph->bitmap.buffer, 
-                                     texOffsetX, 
-                                     texOffsetY))
+        if (!addToTextureAtlas(face->glyph->bitmap.width, 
+                               face->glyph->bitmap.rows, 
+                               face->glyph->bitmap.buffer, 
+                               texIdx,
+                               texGen,
+                               texOffsetX, 
+                               texOffsetY))
         {
             return false;
         }
+
+        texReq_++;
     }
 
     // now store Glyph for later use
     x = Glyph {
         glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
         glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-        glm::ivec2(texOffsetX, texOffsetY)
+        glm::ivec2(texOffsetX, texOffsetY),
+        texIdx,
+        texGen
     };
-    glyphs_.insert(GlyphCache::value_type(key, x));
+    glyphs_[key] = x;
 
     return true;
+}
+
+bool TextRender::addToTextureAtlas(uint16_t width, uint16_t height, const uint8_t *data, 
+                                   int &tex_idx, unsigned int &tex_gen, uint16_t &tex_x, uint16_t &tex_y)
+{
+    for (size_t i = 0; i < tex_.size(); i++)
+    {
+        TextureAtlas *t = tex_[i].get();
+        if (t->AddRegion(width, height, data, tex_x, tex_y))
+        {
+            tex_idx = (unsigned int)i;
+            tex_gen = texGen_[i];
+            return true;
+        }
+    }
+
+    // evict a random choosed one
+    size_t index = (size_t)rand() % tex_.size();
+    TextureAtlas *tex = tex_[index].get();
+    // clear contents
+    tex->Clear();
+    // increment generation
+    texGen_[index]++;
+    texEvict_++;
+
+    // retry
+    if (tex->AddRegion(width, height, data, tex_x, tex_y))
+    {
+        tex_idx = index;
+        tex_gen = texGen_[index];
+        return true;
+    }
+
+    return false;
 }
