@@ -104,11 +104,7 @@ void TextRender::Begin(int fbWidth, int fbHeight)
     glBindVertexArray(vao_);
 }
 
-void TextRender::DrawText(Font& font, 
-                          const std::string& text, 
-                          hb_direction_t direction, 
-                          hb_script_t script, 
-                          hb_language_t language,
+void TextRender::DrawText(TextRun &text, 
                           float x, 
                           float y, 
                           glm::vec3 color)
@@ -117,33 +113,15 @@ void TextRender::DrawText(Font& font,
 
     glActiveTexture(GL_TEXTURE0);
 
-    // Create a hb_buffer.
-    hb_buffer_t *buf = hb_buffer_create();
-    auto buf_guard = scopeGuard([&buf]{ hb_buffer_destroy(buf); });
-    // Put text in.
-    hb_buffer_add_utf8(buf, text.c_str(), -1, 0, -1);
-    // Set the script, language and direction of the buffer.
-    hb_buffer_set_direction(buf, direction);
-    hb_buffer_set_script(buf, script);
-    hb_buffer_set_language(buf, language);
-    // Shape
-    hb_shape(font.getHBFont(), buf, NULL, 0);
-    // Get the glyph and position information.
-    unsigned int glyph_count;
-    hb_glyph_info_t *glyph_info    = hb_buffer_get_glyph_infos(buf, &glyph_count);
-    hb_glyph_position_t *glyph_pos = hb_buffer_get_glyph_positions(buf, &glyph_count);
-    
     // Iterate over each glyph.
-    for (unsigned int i = 0; i < glyph_count; i++)
+    size_t glyph_count = text.GetGlyphCount();
+    for (size_t i = 0; i < glyph_count; i++)
     {
-        hb_codepoint_t glyphid  = glyph_info[i].codepoint;
-        hb_position_t x_offset  = glyph_pos[i].x_offset / 64;
-        hb_position_t y_offset  = glyph_pos[i].y_offset / 64;
-        hb_position_t x_advance = glyph_pos[i].x_advance / 64;
-        hb_position_t y_advance = glyph_pos[i].y_advance / 64;
+        TextRun::GlyphInfo info;
+        text.GetGlyph(i, info);
 
         Glyph g;
-        if (!getGlyph(font, glyphid, g))
+        if (!getGlyph(text.GetFont(), info.glyphid, g))
         {
             // TODO: error log
             break;
@@ -154,8 +132,8 @@ void TextRender::DrawText(Font& font,
             TextureAtlas *t = tex_[g.TexIdx].get();
             glBindTexture(GL_TEXTURE_2D, t->TextureID());
 
-            float glyph_x = x + g.Bearing.x + x_offset;
-            float glyph_y = y - (g.Size.y - g.Bearing.y) + y_offset;
+            float glyph_x = x + g.Bearing.x + info.x_offset;
+            float glyph_y = y - (g.Size.y - g.Bearing.y) + info.y_offset;
             float glyph_w = (float)g.Size.x;
             float glyph_h = (float)g.Size.y;
 
@@ -181,8 +159,8 @@ void TextRender::DrawText(Font& font,
         }
 
         // advance cursors for next glyph
-        x += x_advance;
-        y += y_advance;
+        x += info.x_advance;
+        y += info.y_advance;
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);

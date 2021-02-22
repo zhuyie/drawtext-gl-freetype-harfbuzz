@@ -4,8 +4,8 @@
 #include "shader.h"
 #include "font.h"
 #include "texture_atlas.h"
+#include "text_run.h"
 
-#include <hb.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -50,11 +50,7 @@ public:
 
     void Begin(int fbWidth, int fbHeight);
 
-    void DrawText(Font& font, 
-                  const std::string& text, 
-                  hb_direction_t direction, 
-                  hb_script_t script, 
-                  hb_language_t language,
+    void DrawText(TextRun &text,
                   float x, 
                   float y, 
                   glm::vec3 color);

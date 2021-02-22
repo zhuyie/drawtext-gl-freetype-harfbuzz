@@ -129,6 +129,11 @@ int main(int argc, char* agrv[])
         return 1;
     }
 
+    // Create TextRuns
+    TextRun text0(font0, u8"This is a test.", HB_DIRECTION_LTR, HB_SCRIPT_LATIN, hb_language_from_string("en", -1));
+    TextRun text1(font1, u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_TTB, HB_SCRIPT_HAN, hb_language_from_string("zh", -1));
+    TextRun text2(font2, u8"أسئلة و أجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1));
+
     unsigned int drawCount = 0;
     double drawTime = 0.0;
     draw = [&](GLFWwindow* window)
@@ -146,19 +151,19 @@ int main(int argc, char* agrv[])
 
         render.Begin(width, height);
         render.DrawText(
-            font0, 
-            u8"This is a test.", HB_DIRECTION_LTR, HB_SCRIPT_LATIN, hb_language_from_string("en", -1),
-            DP_X(10.0f*content_scale), DP_Y(60.0f*content_scale), glm::vec3(1.0f, 0.f, 0.f)
+            text0, 
+            DP_X(10.0f*content_scale), DP_Y(60.0f*content_scale), 
+            glm::vec3(1.0f, 0.f, 0.f)
         );
         render.DrawText(
-            font1, 
-            u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_TTB, HB_SCRIPT_HAN, hb_language_from_string("zh", -1),
-            DP_X(325.0f*content_scale), DP_Y(100.0f*content_scale), glm::vec3(0.f, 0.f, 1.f)
+            text1, 
+            DP_X(325.0f*content_scale), DP_Y(100.0f*content_scale), 
+            glm::vec3(0.f, 0.f, 1.f)
         );
         render.DrawText(
-            font2, 
-            u8"أسئلة و أجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1),
-            DP_X(450.0f*content_scale), DP_Y(575.0f*content_scale), glm::vec3(0.f, 1.f, 0.f)
+            text2, 
+            DP_X(450.0f*content_scale), DP_Y(575.0f*content_scale), 
+            glm::vec3(0.f, 1.f, 0.f)
         );
         render.End();
 
@@ -181,6 +186,6 @@ int main(int argc, char* agrv[])
     fprintf(stdout, "draw count   : %u\n", drawCount);
     fprintf(stdout, "avg draw time: %f ms\n", drawTime / drawCount * 1000.0);
     fprintf(stdout, "\n");
-        
+
     return 0;
 }

@@ -40,6 +40,8 @@ add_executable(drawtext
     shader.cpp
     text_render.h
     text_render.cpp
+    text_run.h
+    text_run.cpp
     deps/glad/src/glad.c)
 
 # Workaround for HarfBuzz FreeType integration
