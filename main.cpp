@@ -103,7 +103,7 @@ int main(int argc, char* agrv[])
 
     // Create TextRender
     TextRender render;
-    if (!render.Init())
+    if (!render.Init(4))
     {
         fprintf(stderr, "TextRender Init failed\n");
         return 1;
@@ -129,8 +129,12 @@ int main(int argc, char* agrv[])
         return 1;
     }
 
-    draw = [&render, &font0, &font1, &font2, &content_scale](GLFWwindow* window)
+    unsigned int drawCount = 0;
+    double drawTime = 0.0;
+    draw = [&](GLFWwindow* window)
     {
+        double startTime = glfwGetTime();
+
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
         glViewport(0, 0, width, height);
@@ -157,6 +161,10 @@ int main(int argc, char* agrv[])
             DP_X(450.0f*content_scale), DP_Y(575.0f*content_scale), glm::vec3(0.f, 1.f, 0.f)
         );
         render.End();
+
+        double duration = glfwGetTime() - startTime;
+        drawTime += duration;
+        drawCount++;
     };
 
     // Event loop
@@ -168,5 +176,11 @@ int main(int argc, char* agrv[])
         glfwWaitEvents();
     }
 
+    render.PrintStats();
+    fprintf(stdout, "----draw time stats----\n");
+    fprintf(stdout, "draw count   : %u\n", drawCount);
+    fprintf(stdout, "avg draw time: %f ms\n", drawTime / drawCount * 1000.0);
+    fprintf(stdout, "\n");
+        
     return 0;
 }
