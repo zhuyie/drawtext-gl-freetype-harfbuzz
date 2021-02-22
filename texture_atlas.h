@@ -15,11 +15,13 @@ public:
     bool AddRegion(uint16_t width, uint16_t height, const uint8_t *data, uint16_t &x, uint16_t &y);
 
     void Clear();
-    
+
     uint16_t Width() const { return width_; }
     uint16_t Height() const { return height_; }
     unsigned int TextureID() const { return texture_; }
 
+    float Occupancy() { return binPacker_.Occupancy(); }
+    
 private:
     uint16_t width_;
     uint16_t height_;

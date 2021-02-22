@@ -199,8 +199,15 @@ void TextRender::PrintStats()
 {
     fprintf(stdout, "\n");
     fprintf(stdout, "----glyph texture cache stats----\n");
-    fprintf(stdout, "texture atlas size: %d, %d\n", TextureAtlasWidth, TextureAtlasHeight);
+    fprintf(stdout, "texture atlas size: %d %d\n", TextureAtlasWidth, TextureAtlasHeight);
     fprintf(stdout, "texture atlas count: %d\n", (int)tex_.size());
+    fprintf(stdout, "texture atlas occupancy:");
+    for (size_t i = 0; i < tex_.size(); i++)
+    {
+        float rate = tex_[i].get()->Occupancy() * 100.f;
+        fprintf(stdout, " %.1f%%", rate);
+    }
+    fprintf(stdout, "\n");
     fprintf(stdout, "texture atlas evict: %llu\n", texEvict_);
     fprintf(stdout, "request: %llu\n", texReq_);
     fprintf(stdout, "hit    : %llu (%.2f%%)\n", texHit_, (double)texHit_ / texReq_ * 100);
