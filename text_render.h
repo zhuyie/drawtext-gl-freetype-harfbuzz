@@ -42,11 +42,17 @@ class TextRender
     uint64_t texEvict_;
     GlyphCache glyphs_;
 
+    int maxQuadBatch_;
+    int curQuadBatch_;
+    float* vertices_;
+    glm::vec3 lastColor_;
+    unsigned int lastTexID_;
+
 public:
     TextRender();
     ~TextRender();
 
-    bool Init(int numTextureAltas);
+    bool Init(int numTextureAltas, int maxQuadBatch);
 
     void Begin(int fbWidth, int fbHeight);
 
@@ -63,6 +69,10 @@ private:
     bool getGlyph(Font& font, unsigned int glyph_index, Glyph& x);
     bool addToTextureAtlas(uint16_t width, uint16_t height, const uint8_t *data, 
                            int &tex_idx, unsigned int &tex_gen, uint16_t &tex_x, uint16_t &tex_y);
+    void setTextColor(glm::vec3 color);
+    void setTexID(unsigned int texID);
+    void appendQuad(float vertices[6][4]);
+    void commitDraw();
 };
 
 #endif // !__TEXT_RENDER_H__

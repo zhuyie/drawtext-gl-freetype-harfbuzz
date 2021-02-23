@@ -47,7 +47,8 @@ const int TextureAtlasHeight = 1024;
 //------------------------------------------------------------------------------
 
 TextRender::TextRender()
-: vao_(0), vbo_(0), texReq_(0), texHit_(0), texEvict_(0)
+: vao_(0), vbo_(0), texReq_(0), texHit_(0), texEvict_(0),
+  maxQuadBatch_(0), curQuadBatch_(0), vertices_(nullptr), lastColor_(glm::vec3()), lastTexID_(0)
 {
 }
 
@@ -55,11 +56,13 @@ TextRender::~TextRender()
 {
     glDeleteBuffers(1, &vbo_);
     glDeleteVertexArrays(1, &vao_);
+    free(vertices_);
 }
 
-bool TextRender::Init(int numTextureAtlas)
+bool TextRender::Init(int numTextureAtlas, int maxQuadBatch)
 {
     assert(numTextureAtlas > 0 && numTextureAtlas <= 16);
+    assert(maxQuadBatch > 0 && maxQuadBatch <= 1024);
 
     std::string errorLog;
     if (!shader_.Init(vertex_shader_string, fragment_shader_string, errorLog))
@@ -71,7 +74,7 @@ bool TextRender::Init(int numTextureAtlas)
     glGenBuffers(1, &vbo_);
     glBindVertexArray(vao_);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, maxQuadBatch * sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
     glBindVertexArray(0);
@@ -85,6 +88,13 @@ bool TextRender::Init(int numTextureAtlas)
         }
         tex_.push_back(std::move(t));
         texGen_.push_back(0);
+    }
+
+    maxQuadBatch_ = maxQuadBatch;
+    vertices_ = (float*)malloc(maxQuadBatch_ * sizeof(float) * 6 * 4);
+    if (vertices_ == nullptr)
+    {
+        return false;
     }
 
     return true;
@@ -102,6 +112,8 @@ void TextRender::Begin(int fbWidth, int fbHeight)
     glUniformMatrix4fv(shader_.GetUniformLocation("projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
     glBindVertexArray(vao_);
+
+    glActiveTexture(GL_TEXTURE0);
 }
 
 void TextRender::DrawText(TextRun &text, 
@@ -109,9 +121,7 @@ void TextRender::DrawText(TextRun &text,
                           float y, 
                           glm::vec3 color)
 {
-    glUniform3f(shader_.GetUniformLocation("textColor"), color.x, color.y, color.z);
-
-    glActiveTexture(GL_TEXTURE0);
+    setTextColor(color);
 
     // Iterate over each glyph.
     size_t glyph_count = text.GetGlyphCount();
@@ -130,7 +140,7 @@ void TextRender::DrawText(TextRun &text,
         if (g.Size.x > 0 && g.Size.y > 0)
         {
             TextureAtlas *t = tex_[g.TexIdx].get();
-            glBindTexture(GL_TEXTURE_2D, t->TextureID());
+            setTexID(t->TextureID());
 
             float glyph_x = x + g.Bearing.x + info.x_offset;
             float glyph_y = y - (g.Size.y - g.Bearing.y) + info.y_offset;
@@ -152,22 +162,19 @@ void TextRender::DrawText(TextRun &text,
                 { glyph_x + glyph_w, glyph_y,           tex_x + tex_w, tex_y + tex_h },
                 { glyph_x + glyph_w, glyph_y + glyph_h, tex_x + tex_w, tex_y         }
             };
-            // update content of VBO memory
-            glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices); 
-            // render quad
-            glDrawArrays(GL_TRIANGLES, 0, 6);
+            appendQuad(vertices);
         }
 
         // advance cursors for next glyph
         x += info.x_advance;
         y += info.y_advance;
     }
-
-    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void TextRender::End()
 {
+    commitDraw();
+
     glBindVertexArray(0);
 
     shader_.Use(false);
@@ -300,4 +307,45 @@ bool TextRender::addToTextureAtlas(uint16_t width, uint16_t height, const uint8_
     }
 
     return false;
+}
+
+void TextRender::setTextColor(glm::vec3 color)
+{
+    if (lastColor_ != color)
+        commitDraw();
+
+    glUniform3f(shader_.GetUniformLocation("textColor"), color.x, color.y, color.z);
+    lastColor_ = color;
+}
+
+void TextRender::setTexID(unsigned int texID)
+{
+    if (texID != lastTexID_)
+        commitDraw();
+
+    glBindTexture(GL_TEXTURE_2D, texID);
+    lastTexID_ = texID;
+}
+
+void TextRender::appendQuad(float vertices[6][4])
+{
+    if (curQuadBatch_ == maxQuadBatch_)
+        commitDraw();
+
+    assert(curQuadBatch_ < maxQuadBatch_);
+    memcpy(vertices_ + curQuadBatch_ * 6 * 4, vertices, sizeof(float) * 6 * 4);
+    curQuadBatch_++;
+}
+
+void TextRender::commitDraw()
+{
+    if (!curQuadBatch_)
+        return;
+
+    // update content of VBO memory
+    glBufferSubData(GL_ARRAY_BUFFER, 0, curQuadBatch_ * sizeof(float) * 6 * 4, vertices_);
+    // render quad
+    glDrawArrays(GL_TRIANGLES, 0, curQuadBatch_ * 6);
+
+    curQuadBatch_ = 0;
 }

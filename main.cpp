@@ -103,7 +103,7 @@ int main(int argc, char* agrv[])
 
     // Create TextRender
     TextRender render;
-    if (!render.Init(4))
+    if (!render.Init(4, 256))
     {
         fprintf(stderr, "TextRender Init failed\n");
         return 1;
