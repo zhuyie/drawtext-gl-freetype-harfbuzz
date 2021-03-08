@@ -2,7 +2,9 @@
 #include "scope_guard.h"
 
 Font::Font(FT_Library ftLib, const char* fontFile, float fontSize, float contentScale, bool bold, bool italic)
-: ftFont_(NULL), hbFont_(NULL), fontSize_(0), contentScale_(0), bold_(false), italic_(false), initOK_(false)
+: ftFont_(NULL), hbFont_(NULL), 
+  fontSize_(0), contentScale_(0), bold_(false), italic_(false), underlinePos_(0), underlineThickness_(0), 
+  initOK_(false)
 {
     init(ftLib, fontFile, fontSize, contentScale, bold, italic);
 }
@@ -46,6 +48,11 @@ void Font::init(FT_Library ftLib, const char* fontFile, float fontSize, float co
         logic_dpi_y                              // vertical device resolution
     );
 
+    underlinePos_ = 
+        ftFont_->underline_position / (float)ftFont_->units_per_EM * ftFont_->size->metrics.y_ppem;
+    underlineThickness_ = 
+        ftFont_->underline_thickness / (float)ftFont_->units_per_EM * ftFont_->size->metrics.y_ppem;
+
     hbFont_ = hb_ft_font_create_referenced(ftFont_);
 
     ftFont_guard.dismiss();
@@ -54,6 +61,10 @@ void Font::init(FT_Library ftLib, const char* fontFile, float fontSize, float co
     contentScale_ = contentScale;
     bold_ = bold;
     italic_ = italic;
+    if (synthesisBold())
+    {
+        underlineThickness_ *= 1.5f;
+    }
     initOK_ = true;
     return;
 }

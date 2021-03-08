@@ -41,6 +41,7 @@ class TextRender
     uint64_t texHit_;
     uint64_t texEvict_;
     GlyphCache glyphs_;
+    Glyph line_;
 
     int maxQuadBatch_;
     int curQuadBatch_;
@@ -67,6 +68,7 @@ public:
 
 private:
     bool getGlyph(Font& font, unsigned int glyph_index, Glyph& x);
+    bool setupLineGlyph();
     bool addToTextureAtlas(uint16_t width, uint16_t height, const uint8_t *data, 
                            int &tex_idx, unsigned int &tex_gen, uint16_t &tex_x, uint16_t &tex_y);
     void setTextColor(glm::vec3 color);

@@ -47,7 +47,7 @@ const int TextureAtlasHeight = 1024;
 //------------------------------------------------------------------------------
 
 TextRender::TextRender()
-: vao_(0), vbo_(0), texReq_(0), texHit_(0), texEvict_(0),
+: vao_(0), vbo_(0), texReq_(0), texHit_(0), texEvict_(0), line_(Glyph{}),
   maxQuadBatch_(0), curQuadBatch_(0), vertices_(nullptr), lastColor_(glm::vec3()), lastTexID_(0)
 {
 }
@@ -89,6 +89,8 @@ bool TextRender::Init(int numTextureAtlas, int maxQuadBatch)
         tex_.push_back(std::move(t));
         texGen_.push_back(0);
     }
+
+    line_.TexIdx = -1;
 
     maxQuadBatch_ = maxQuadBatch;
     vertices_ = (float*)malloc(maxQuadBatch_ * sizeof(float) * 6 * 4);
@@ -161,6 +163,34 @@ void TextRender::DrawText(TextRun &text,
                 { glyph_x,           glyph_y + glyph_h, tex_x,         tex_y         },
                 { glyph_x + glyph_w, glyph_y,           tex_x + tex_w, tex_y + tex_h },
                 { glyph_x + glyph_w, glyph_y + glyph_h, tex_x + tex_w, tex_y         }
+            };
+            appendQuad(vertices);
+        }
+
+        if (text.Underline())
+        {
+            setupLineGlyph();
+            
+            TextureAtlas *t = tex_[line_.TexIdx].get();
+            setTexID(t->TextureID());
+            float tex_x = (line_.TexOffset.x+1) / (float)t->Width();
+            float tex_y = (line_.TexOffset.y+1) / (float)t->Height();
+            float tex_w = (line_.Size.x-2) / (float)t->Width();
+            float tex_h = (line_.Size.y-2) / (float)t->Height();
+
+            float x0 = x;
+            float y0 = y + text.GetFont().getUnderlinePos();
+            float w0 = info.x_advance;
+            float h0 = text.GetFont().getUnderlineThickness();
+
+            float vertices[6][4] = {
+                { x0,      y0 + h0, tex_x,         tex_y         },
+                { x0,      y0,      tex_x,         tex_y + tex_h },
+                { x0 + w0, y0,      tex_x + tex_w, tex_y + tex_h },
+
+                { x0,      y0 + h0, tex_x,         tex_y         },
+                { x0 + w0, y0,      tex_x + tex_w, tex_y + tex_h },
+                { x0 + w0, y0 + h0, tex_x + tex_w, tex_y         }
             };
             appendQuad(vertices);
         }
@@ -273,6 +303,32 @@ bool TextRender::getGlyph(Font& font, unsigned int glyph_index, Glyph& x)
     glyphs_[key] = x;
 
     return true;
+}
+
+bool TextRender::setupLineGlyph()
+{
+    if (line_.TexIdx >= 0 && line_.TexGen == texGen_[line_.TexIdx])
+    {
+        return true;
+    }
+
+    static uint8_t data[4*4] = {
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+        255, 255, 255, 255,
+    };
+    uint16_t tex_x, tex_y;
+    if (addToTextureAtlas(4, 4, data, line_.TexIdx, line_.TexGen, tex_x, tex_y))
+    {
+        line_.Size.x = 4;
+        line_.Size.y = 4;
+        line_.TexOffset.x = tex_x;
+        line_.TexOffset.y = tex_y;
+        return true;
+    }
+
+    return false;
 }
 
 bool TextRender::addToTextureAtlas(uint16_t width, uint16_t height, const uint8_t *data, 

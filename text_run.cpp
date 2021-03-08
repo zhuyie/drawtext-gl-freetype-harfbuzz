@@ -6,8 +6,9 @@ TextRun::TextRun(Font &font,
                  const std::string &text,
                  hb_direction_t direction, 
                  hb_script_t script, 
-                 hb_language_t language)
-: font_(font), text_(text), direction_(direction), script_(script), language_(language)
+                 hb_language_t language,
+                 bool underline)
+: font_(font), text_(text), direction_(direction), script_(script), language_(language), underline_(underline)
 {
     setDirty();
 }

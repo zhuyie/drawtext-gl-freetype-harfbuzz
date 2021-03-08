@@ -17,6 +17,8 @@ class Font
     float contentScale_;
     bool bold_;
     bool italic_;
+    float underlinePos_;
+    float underlineThickness_;
     bool initOK_;
 
 public:
@@ -40,7 +42,15 @@ public:
     {
         return (italic_ && !(ftFont_->style_flags & FT_STYLE_FLAG_ITALIC));
     }
-
+    float getUnderlinePos() const
+    {
+        return underlinePos_;
+    }
+    float getUnderlineThickness() const
+    {
+        return underlineThickness_;
+    }
+    
 private:
     void init(FT_Library ftLib, const char* fontFile, float fontSize, float contentScale, bool bold, bool italic);
     unsigned int genID();

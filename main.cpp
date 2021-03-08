@@ -130,9 +130,9 @@ int main(int argc, char* agrv[])
     }
 
     // Create TextRuns
-    TextRun text0(font0, u8"This is a test.", HB_DIRECTION_LTR, HB_SCRIPT_LATIN, hb_language_from_string("en", -1));
-    TextRun text1(font1, u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_TTB, HB_SCRIPT_HAN, hb_language_from_string("zh", -1));
-    TextRun text2(font2, u8"أسئلة و أجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1));
+    TextRun text0(font0, u8"This is a test.", HB_DIRECTION_LTR, HB_SCRIPT_LATIN, hb_language_from_string("en", -1), true);
+    TextRun text1(font1, u8"天地玄黄，宇宙洪荒。", HB_DIRECTION_TTB, HB_SCRIPT_HAN, hb_language_from_string("zh", -1), false);
+    TextRun text2(font2, u8"أسئلة و أجوبة", HB_DIRECTION_RTL, HB_SCRIPT_ARABIC, hb_language_from_string("ar", -1), false);
 
     unsigned int drawCount = 0;
     double drawTime = 0.0;

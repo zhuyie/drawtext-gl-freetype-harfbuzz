@@ -24,6 +24,7 @@ private:
     hb_direction_t direction_; 
     hb_script_t script_; 
     hb_language_t language_;
+    bool underline_;
     std::vector<GlyphInfo> glyphs_;
     bool dirty_;
 
@@ -32,13 +33,23 @@ public:
             const std::string &text,
             hb_direction_t direction, 
             hb_script_t script, 
-            hb_language_t language);
+            hb_language_t language,
+            bool underline);
     ~TextRun();
 
     Font& GetFont() const { return font_; }
 
     size_t GetGlyphCount();
     void GetGlyph(size_t index, GlyphInfo &info);
+
+    bool Underline() const
+    {
+        if (!HB_DIRECTION_IS_HORIZONTAL(direction_))
+        {
+            return false;
+        }
+        return underline_;
+    }
 
 private:
     void setDirty();
